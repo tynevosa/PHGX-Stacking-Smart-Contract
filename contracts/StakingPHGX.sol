@@ -20,7 +20,7 @@ contract StakingPHGX is ERC20 {
         uint256 planId;
         uint256 stakingTimestamp;
     }
-    mapping(address => Staker) public stakers;
+    mapping(address => Staker[]) public stakers;
 
     // Staking contract state
     mapping(address => uint256) public stakedBalance;
@@ -57,46 +57,75 @@ contract StakingPHGX is ERC20 {
     
     function stake(uint256 amount, uint256 planId) external payable{
         require(planId < planCount, "Invalid plan ID");
-        require(amount >= plans[planId].minimalAmount, "Amount must be greater than mininal amount of stake of the plan");
-        require(stakers[msg.sender].amount == 0, "User already has an existing stake");
+        require(amount >= plans[planId].minimalAmount, "Amount must be greater than minimal amount of stake of the plan");
         
         IERC20(token).transferFrom(msg.sender, address(this), amount);
 
-        stakers[msg.sender] = Staker(amount, planId, block.timestamp);
+        stakers[msg.sender].push(Staker(amount, planId, block.timestamp));
 
         emit Staked(msg.sender, amount, planId);
     }
 
-    function unstake() external payable {
-        require(stakers[msg.sender].amount > 0, "No stake to withdraw");
+    function unstake(uint256 index) external payable {
+        require(index < stakers[msg.sender].length, "No stake to withdraw");
 
-        uint256 stakedAmount = stakers[msg.sender].amount;
-        uint256 planId = stakers[msg.sender].planId;
+        uint256 stakedAmount = stakers[msg.sender][index].amount;
+        uint256 planId = stakers[msg.sender][index].planId;
 
-        require(block.timestamp >= stakers[msg.sender].stakingTimestamp + plans[planId].unlockPeriod, "Stake is still locked");
+        require(block.timestamp >= stakers[msg.sender][index].stakingTimestamp + plans[planId].unlockPeriod, "Stake is still locked");
 
         uint256 reward = 0;
         if (plans[planId].unlockPeriod > 0) {
             reward = ( stakedAmount * plans[planId].rewardRate ) / 100 + stakedAmount;
         } else {
-            reward = ( block.timestamp - stakers[msg.sender].stakingTimestamp ) * stakedAmount * plans[planId].rewardRate / 315360 + stakedAmount;
+            reward = ( block.timestamp - stakers[msg.sender][index].stakingTimestamp ) * stakedAmount * plans[planId].rewardRate / 31536000 + stakedAmount;
         }
 
         IERC20(token).transfer(msg.sender, reward);
 
-        delete stakers[msg.sender];
+        // Remove the stake at the specified index
+        if(index < stakers[msg.sender].length - 1) {
+            for (uint256 i = index; i < stakers[msg.sender].length - 1; i++) {
+                stakers[msg.sender][i] = stakers[msg.sender][i + 1];
+            }
+        }
+        stakers[msg.sender].pop();
 
         emit Unstaked(msg.sender, reward);
     }
 
-    function unlockingTime() external view returns (uint256) {
-        require(stakers[msg.sender].amount > 0, "No stake to withdraw");
-        uint256 planId = stakers[msg.sender].planId;
-        uint256 timeRemaining = block.timestamp - stakers[msg.sender].stakingTimestamp;
-        if(timeRemaining >= plans[planId].unlockPeriod) {
-            return 0;
-        } else {
-            return timeRemaining;
+    struct StakerInfo {
+        uint256 amount;
+        uint256 planId;
+        uint256 stakingTimestamp;
+        uint256 unlockingTime;
+    }
+
+    function getStakers() external view returns (StakerInfo[] memory) {
+        uint256 stakerCount = stakers[msg.sender].length;
+        StakerInfo[] memory stakerInfos = new StakerInfo[](stakerCount);
+
+        for (uint256 i = 0; i < stakerCount; i++) {
+            Staker memory staker = stakers[msg.sender][i];
+            uint256 planId = staker.planId;
+            uint256 unlockingTime = staker.stakingTimestamp + plans[planId].unlockPeriod;
+
+            stakerInfos[i].amount = staker.amount;
+            stakerInfos[i].planId = planId;
+            stakerInfos[i].stakingTimestamp = staker.stakingTimestamp;
+            stakerInfos[i].unlockingTime = unlockingTime;
         }
+
+        return stakerInfos;
+    }
+
+    function getPlans() external view returns (Plan[] memory) {
+        Plan[] memory allPlans = new Plan[](planCount);
+
+        for (uint256 i = 0; i < planCount; i++) {
+            allPlans[i] = plans[i];
+        }
+
+        return allPlans;
     }
 }

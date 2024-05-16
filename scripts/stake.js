@@ -1,14 +1,15 @@
 const { ethers } = require('ethers');
-const tokenAbi = require('../const/tokenAbi.json');
-const stakingContractAbi =  require('../const/stakingContractAbi.json');
+const tokenContractInfo = require('../artifacts/contracts/PHGX.sol/PHGX.json');
+const stakingContractInfo =  require('../artifacts/contracts/StakingPHGX.sol/StakingPHGX.json');
+const constants = require('../const');
 
 async function addPlan(rewardRate, unlockPeriod, minimalAmount) {
-  const provider = new ethers.providers.JsonRpcProvider(process.env.NODE_URL);
-  const signer = new ethers.Wallet(process.env.CONTRACT_OWNER_PRIVATE_KEY, provider);
+  const provider = new ethers.providers.JsonRpcProvider(constants.NODE_URL);
+  const signer = new ethers.Wallet(constants.CONTRACT_OWNER_PRIVATE_KEY, provider);
 
   // Staking Smart Contract
-  const stakingContractAddress = process.env.STAKING_CONTRACT_ADDRESS;
-  const stakingContract = new ethers.Contract(stakingContractAddress, stakingContractAbi, signer);
+  const stakingContractAddress = constants.STAKING_CONTRACT_ADDRESS;
+  const stakingContract = new ethers.Contract(stakingContractAddress, stakingContractInfo.abi, signer);
 
   // Add plan
   const gasLimit = 200000; // default is 21000, must be higher than default to interact with smart contract!
@@ -20,12 +21,12 @@ async function addPlan(rewardRate, unlockPeriod, minimalAmount) {
 }
 
 async function getPlan(planId) {
-  const provider = new ethers.providers.JsonRpcProvider(process.env.NODE_URL);
-  const signer = new ethers.Wallet(process.env.USER_PRIVATE_KEY, provider);
+  const provider = new ethers.providers.JsonRpcProvider(constants.NODE_URL);
+  const signer = new ethers.Wallet(constants.USER_PRIVATE_KEY, provider);
 
   // Staking Smart Contract
-  const stakingContractAddress = process.env.STAKING_CONTRACT_ADDRESS;
-  const stakingContract = new ethers.Contract(stakingContractAddress, stakingContractAbi, signer);
+  const stakingContractAddress = constants.STAKING_CONTRACT_ADDRESS;
+  const stakingContract = new ethers.Contract(stakingContractAddress, stakingContractInfo.abi, signer);
 
   // Get plan by Id
   const plan = await stakingContract.plans(planId);
@@ -33,32 +34,47 @@ async function getPlan(planId) {
   console.log(`Plan[${planId}]: `, plan);
 }
 
-async function getUnlockingTime(staker_address) {
-  const provider = new ethers.providers.JsonRpcProvider(process.env.NODE_URL);
-  const signer = new ethers.Wallet(process.env.USER_PRIVATE_KEY, provider);
+async function planCount() {
+  const provider = new ethers.providers.JsonRpcProvider(constants.NODE_URL);
+  const signer = new ethers.Wallet(constants.USER_PRIVATE_KEY, provider);
 
   // Staking Smart Contract
-  const stakingContractAddress = process.env.STAKING_CONTRACT_ADDRESS;
-  const stakingContract = new ethers.Contract(stakingContractAddress, stakingContractAbi, signer);
+  const stakingContractAddress = constants.STAKING_CONTRACT_ADDRESS;
+  const stakingContract = new ethers.Contract(stakingContractAddress, stakingContractInfo.abi, signer);
 
   // Get plan by Id
-  let unlockingTime = await stakingContract.unlockingTime(staker_address);
-  unlockingTime = parseInt(unlockingTime.toString())
+  const planCount = await stakingContract.planCount();
 
-  console.log(`Stakder's unlocking time - ${staker_address} : `, unlockingTime);
+  console.log(`Plan Count: ${planCount}`);
+}
+
+async function getStaker() {
+  const provider = new ethers.providers.JsonRpcProvider(constants.NODE_URL);
+  const signer = new ethers.Wallet(constants.USER_PRIVATE_KEY, provider);
+
+  // Staking Smart Contract
+  const stakingContractAddress = constants.STAKING_CONTRACT_ADDRESS;
+  const stakingContract = new ethers.Contract(stakingContractAddress, stakingContractInfo.abi, signer);
+
+  // Get staker
+  let stakerInfo = await stakingContract.getStaker();
+  
+  // stakerInfo = parseInt(stakerInfo.toString())
+
+  console.log(`Stakder's Information - ${constants.USER_WALLET_ADDRESS} : `, parseInt(stakerInfo[0].toString()));
 }
 
 async function stakeTokens(amount, planId) {
-  const provider = new ethers.providers.JsonRpcProvider(process.env.NODE_URL);
-  const signer = new ethers.Wallet(process.env.USER_PRIVATE_KEY, provider);
+  const provider = new ethers.providers.JsonRpcProvider(constants.NODE_URL);
+  const signer = new ethers.Wallet(constants.USER_PRIVATE_KEY, provider);
 
   // ERC-20 Token
-  const tokenAddress = process.env.TOKEN_CONTRACT_ADDRESS;
-  const tokenContract = new ethers.Contract(tokenAddress, tokenAbi, signer);
+  const tokenAddress = constants.TOKEN_CONTRACT_ADDRESS;
+  const tokenContract = new ethers.Contract(tokenAddress, tokenContractInfo.abi, signer);
 
   // Staking Smart Contract
-  const stakingContractAddress = process.env.STAKING_CONTRACT_ADDRESS;
-  const stakingContract = new ethers.Contract(stakingContractAddress, stakingContractAbi, signer);
+  const stakingContractAddress = constants.STAKING_CONTRACT_ADDRESS;
+  const stakingContract = new ethers.Contract(stakingContractAddress, stakingContractInfo.abi, signer);
 
   // Set the allowance for the staking contract to spend your tokens
   const approvalTx = await tokenContract.approve(stakingContractAddress, ethers.utils.parseEther("100000"));
@@ -72,12 +88,12 @@ async function stakeTokens(amount, planId) {
 }
 
 async function unstakeTokens() {
-  const provider = new ethers.providers.JsonRpcProvider(process.env.NODE_URL);
-  const signer = new ethers.Wallet(process.env.USER_PRIVATE_KEY, provider);
+  const provider = new ethers.providers.JsonRpcProvider(constants.NODE_URL);
+  const signer = new ethers.Wallet(constants.USER_PRIVATE_KEY, provider);
 
   // Staking Smart Contract
-  const stakingContractAddress = process.env.STAKING_CONTRACT_ADDRESS;
-  const stakingContract = new ethers.Contract(stakingContractAddress, stakingContractAbi, signer);
+  const stakingContractAddress = constants.STAKING_CONTRACT_ADDRESS;
+  const stakingContract = new ethers.Contract(stakingContractAddress, stakingContractInfo.abi, signer);
 
   // Unstake your tokens
   const stakeTx = await stakingContract.unstake();
@@ -86,17 +102,17 @@ async function unstakeTokens() {
   console.log('Tokens unstaked successfully -  Transaction hash: ', receipt.transactionHash);
 }
 
-// addPlan(10, 300, 1000)
+// planCount()
+
+// addPlan(20, 300, 100)
+// addPlan(10, 0, 1000)
 
 // getPlan(0)
 
-// getUnlockingTime(process.env.USER_WALLET_ADDRESS)
+// getStaker()
+
+// getUnlockingTime(constants.USER_WALLET_ADDRESS)
 
 // stakeTokens(10000, 0)
-//   .then(() => process.exit(0))
-//   .catch((error) => {
-//     console.error(error);
-//     process.exit(1);
-//   });
 
 // unstakeTokens()
